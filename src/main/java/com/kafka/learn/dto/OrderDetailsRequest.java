@@ -1,6 +1,6 @@
-package com.kafka.learn.dto.request;
+package com.kafka.learn.dto;
 
-import com.kafka.learn.dto.Items;
+import com.kafka.learn.entities.Items;
 import lombok.*;
 
 import java.util.List;

@@ -1,4 +1,4 @@
-package com.kafka.learn.utils;
+package com.kafka.learn.service;
 
 import com.kafka.learn.dto.Notification;
 import org.springframework.stereotype.Service;

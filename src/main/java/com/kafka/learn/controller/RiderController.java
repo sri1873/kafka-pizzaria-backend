@@ -32,5 +32,5 @@ public class RiderController {
     @GetMapping("/rider/deliver")
     public void deliverOrder(@RequestParam UUID orderId) {
         riderService.deliverOrder(orderId);
-        }
+    }
 }

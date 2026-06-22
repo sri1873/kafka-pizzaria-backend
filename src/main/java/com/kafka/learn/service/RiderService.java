@@ -1,7 +1,7 @@
 package com.kafka.learn.service;
 
-import com.kafka.learn.dto.OrderDetails;
 import com.kafka.learn.dto.OrderStatus;
+import com.kafka.learn.entities.OrderDetails;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -27,7 +27,7 @@ public class RiderService {
 
             UUID assignedRider = assignRider();
 
-            order.setRiderId(assignedRider);
+//            order.setRiderId(assignedRider);
             order.setStatus(OrderStatus.RIDER_ASSIGNED);
             order.setLastUpdated(Instant.now());
 
@@ -49,18 +49,21 @@ public class RiderService {
         order.setLastUpdated(Instant.now());
         kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
     }
+
     public void deliverOrder(UUID orderId) {
         OrderDetails order = new OrderDetails();
         order.setStatus(OrderStatus.DELIVERED);
         order.setLastUpdated(Instant.now());
         kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
     }
-    public void pickupOrder(UUID  orderId) {
+
+    public void pickupOrder(UUID orderId) {
         OrderDetails order = new OrderDetails();
         order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
         order.setLastUpdated(Instant.now());
         kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
     }
+
     private UUID assignRider() {
         // Simulate rider assignment logic
         return UUID.randomUUID();

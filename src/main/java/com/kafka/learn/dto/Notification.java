@@ -1,5 +1,6 @@
 package com.kafka.learn.dto;
 
+import com.kafka.learn.entities.OrderDetails;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -15,5 +16,5 @@ public class Notification {
     private UUID orderId;
     private String role;
     private String message;
-
+    private OrderDetails orderDetails;
 }

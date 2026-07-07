@@ -19,4 +19,6 @@ public interface RestaurantRepository extends JpaRepository<OrderDetails, UUID> 
     @Query(value = "SELECT o FROM OrderDetails o WHERE o.status = :status")
     List<OrderDetails> findByStatus(OrderStatus status);
 
+    @Query(value = "SELECT o FROM OrderDetails o WHERE o.rider.riderId = :riderId")
+    Optional<OrderDetails> findByRiderId(UUID riderId);
 }

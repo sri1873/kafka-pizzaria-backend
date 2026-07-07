@@ -1,14 +1,27 @@
 package com.kafka.learn.service;
 
+import com.kafka.learn.dto.Notification;
 import com.kafka.learn.dto.OrderStatus;
 import com.kafka.learn.entities.OrderDetails;
+import com.kafka.learn.entities.Rider;
+import com.kafka.learn.repositories.RestaurantRepository;
+import com.kafka.learn.repositories.RiderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.geo.Point;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class RiderService {
@@ -17,57 +30,97 @@ public class RiderService {
 //      Driver Loaction Tracking
 //      Driver accepts or rejects order
 
+    private final Point restaurantLocation = new Point(-6.2603, 53.3498);
     @Autowired
     private KafkaTemplate<String, OrderDetails> kafkaTemplate;
+    @Autowired
+    private RiderLocationService riderLocationService;
+    @Autowired
+    private NotificationService notificationService;
+    @Autowired
+    private RiderRepository riderRepository;
+    @Autowired
+    private RestaurantRepository restaurantRepository;
+    private Map<UUID, CompletableFuture<Boolean>> pendingResponses = new ConcurrentHashMap<>();
 
     @KafkaListener(topics = "order_info", groupId = "rider-service-group")
     public void consume(OrderDetails order) {
         System.out.println("Consumed Message in rider service: " + order.toString());
         if (order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
-
-            UUID assignedRider = assignRider();
-
-//            order.setRiderId(assignedRider);
-            order.setStatus(OrderStatus.RIDER_ASSIGNED);
+            assignRider(order);
             order.setLastUpdated(Instant.now());
-
-            kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
-            System.out.println("Received Message in rider service: " + order.toString());
+            restaurantRepository.save(order);
         }
     }
 
-    public void acceptsOrder(UUID orderId) {
-        OrderDetails order = new OrderDetails();
-        order.setStatus(OrderStatus.RIDER_ACCEPTED);
-        order.setLastUpdated(Instant.now());
-        kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+    @Async
+    private void assignRider(OrderDetails order) {
+        List<UUID> nearbyRiders = riderLocationService.findNearbyRiders(restaurantLocation, 5.0);
+        for (UUID riderId : nearbyRiders) {
+            CompletableFuture<Boolean> future = new CompletableFuture<>();
+            pendingResponses.put(order.getOrderId(), future);
+            notificationService.sendNotification(riderId,
+                    Notification.builder().role("RIDER").orderDetails(order).orderId(order.getOrderId()).message("NEW ORDER ASSIGNMENT").build());
+            try {
+                // wait up to 10 seconds for accept/decline
+                Boolean accepted = future.get(10, TimeUnit.SECONDS);
+                if (accepted) {
+                    Rider rider = riderRepository.findByRiderId(riderId).orElse(null);
+                    order.setRider(rider);
+                    order.setStatus(OrderStatus.RIDER_ASSIGNED);
+                    kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+                    return; // done — stop the loop
+                }
+                // declined — move to next rider
+            } catch (TimeoutException e) {
+                // no response in time — move to next rider
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                pendingResponses.remove(order.getOrderId());
+            }
+        }
+    }
+
+    public void acceptOrder(UUID orderId) {
+        CompletableFuture<Boolean> future = pendingResponses.get(orderId);
+        if (future != null) {
+            future.complete(true); // unblocks the waiting assignRider loop
+        }
     }
 
     public void rejectOrder(UUID orderId) {
-        OrderDetails order = new OrderDetails();
-        order.setStatus(OrderStatus.READY_FOR_PICKUP);
-        order.setLastUpdated(Instant.now());
-        kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+        CompletableFuture<Boolean> future = pendingResponses.get(orderId);
+        if (future != null) {
+            future.complete(false); // unblocks the waiting assignRider loop
+        }
     }
 
     public void deliverOrder(UUID orderId) {
-        OrderDetails order = new OrderDetails();
-        order.setStatus(OrderStatus.DELIVERED);
-        order.setLastUpdated(Instant.now());
-        kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+
+        Optional<OrderDetails> orderDetailsOptional = restaurantRepository.findById(orderId);
+        if (orderDetailsOptional.isPresent()) {
+            OrderDetails orderDetails = orderDetailsOptional.get();
+            orderDetails.setStatus(OrderStatus.DELIVERED);
+            orderDetails.setLastUpdated(Instant.now());
+            restaurantRepository.save(orderDetails);
+            kafkaTemplate.send("order_info",orderId.toString(), orderDetails);
+        }
     }
 
     public void pickupOrder(UUID orderId) {
-        OrderDetails order = new OrderDetails();
-        order.setStatus(OrderStatus.OUT_FOR_DELIVERY);
-        order.setLastUpdated(Instant.now());
-        kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+        Optional<OrderDetails> orderDetailsOptional = restaurantRepository.findById(orderId);
+        if (orderDetailsOptional.isPresent()) {
+            OrderDetails orderDetails = orderDetailsOptional.get();
+            orderDetails.setStatus(OrderStatus.OUT_FOR_DELIVERY);
+            orderDetails.setLastUpdated(Instant.now());
+            restaurantRepository.save(orderDetails);
+            kafkaTemplate.send("order_info",orderId.toString(), orderDetails);
+        }
     }
 
-    private UUID assignRider() {
-        // Simulate rider assignment logic
-        return UUID.randomUUID();
-
+    public boolean riderAssigned(UUID riderId) {
+        Optional<Rider> byRiderId = riderRepository.findByRiderId(riderId);
+        return byRiderId.isPresent() && byRiderId.get().isAssigned();
     }
-
 }

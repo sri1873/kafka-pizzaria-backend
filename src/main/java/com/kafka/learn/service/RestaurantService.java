@@ -9,7 +9,6 @@ import com.kafka.learn.entities.User;
 import com.kafka.learn.repositories.RestaurantRepository;
 import com.kafka.learn.repositories.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -41,16 +40,9 @@ public class RestaurantService {
 
         restaurantRepository.save(orderDetails);
         kafkaTemplate.send("order_info", orderDetails.getOrderId().toString(), orderDetails);
+        notificationService.sendNotification(restaurantId, Notification.builder().orderId(orderDetails.getOrderId()).orderDetails(orderDetails)
+                .message("New Order Placed").build());
         return orderDetails;
-    }
-
-
-    @KafkaListener(topics = "order_info", groupId = "restaurant-service-group")
-    public void handleOrderPlaced(OrderDetails order) {
-        if (order.getStatus() == OrderStatus.PLACED) {
-            notificationService.sendNotification(restaurantId, Notification.builder().orderId(order.getOrderId()).orderDetails(order)
-                    .message("New Order Placed").build());
-        }
     }
 
     public void updateOrderStatus(UpdateOrderStatusDTO updateOrderStatusDTO) {
@@ -65,5 +57,9 @@ public class RestaurantService {
 
     public List<OrderDetails> getOrderByStatus(String orderStatus) {
         return restaurantRepository.findByStatus(OrderStatus.valueOf(orderStatus));
+    }
+
+    public Optional<OrderDetails> getOrderByRiderId(UUID riderId) {
+        return restaurantRepository.findByRiderId(riderId);
     }
 }

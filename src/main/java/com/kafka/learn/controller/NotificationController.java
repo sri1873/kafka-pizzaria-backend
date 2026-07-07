@@ -24,4 +24,9 @@ public class NotificationController {
     public SseEmitter customerEvents(@PathVariable UUID userId) {
         return notificationService.subscribe(userId);
     }
+
+    @GetMapping(value = "/rider/events/{userId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter riderEvents(@PathVariable UUID userId) {
+        return notificationService.subscribe(userId);
+    }
 }

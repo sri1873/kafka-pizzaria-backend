@@ -5,9 +5,11 @@ import com.kafka.learn.dto.UpdateOrderStatusDTO;
 import com.kafka.learn.entities.OrderDetails;
 import com.kafka.learn.service.RestaurantService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 public class RestaurantController {
@@ -29,6 +31,14 @@ public class RestaurantController {
     @PostMapping(value = "/restaurant/placeorder", headers = {"content-type=application/json"})
     public OrderDetails order(@RequestBody OrderDetailsRequest orderDetailsRequest) {
         return restaurantService.newOrder(orderDetailsRequest);
+    }
+
+    @GetMapping("/restaurant/order/byrider")
+    public ResponseEntity<OrderDetails> findByRiderId(@RequestParam UUID riderId) {
+
+        return restaurantService.getOrderByRiderId(riderId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
 }

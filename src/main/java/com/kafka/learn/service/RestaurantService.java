@@ -62,4 +62,8 @@ public class RestaurantService {
     public Optional<OrderDetails> getOrderByRiderId(UUID riderId) {
         return restaurantRepository.findByRiderId(riderId);
     }
+
+    public List<OrderDetails> getOrderByUserId(UUID userId) {
+        return restaurantRepository.findByUserId(userId);
+    }
 }

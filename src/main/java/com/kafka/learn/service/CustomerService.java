@@ -16,15 +16,17 @@ public class CustomerService {
 
 
     @Autowired
-    NotificationService notificationService;
+    private NotificationService notificationService;
 
     @Autowired
-    UserRepository userRepository;
+    private UserRepository userRepository;
+
+
 
     @KafkaListener(topics = "order_info", groupId = "customer-service-group")
     public void customerOrderUpdate(OrderDetails order) {
         notificationService.sendNotification(order.getUser().getUserId(),
-                Notification.builder().orderId(order.getOrderId()).orderDetails(order).role("CUSTOMER").message(order.getItems().toString()).build());
+                Notification.builder().orderId(order.getOrderId()).orderDetails(order).role("CUSTOMER").build());
         System.out.println("Received Message in customer service " + order.toString());
     }
 

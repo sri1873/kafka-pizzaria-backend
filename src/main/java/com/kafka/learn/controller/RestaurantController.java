@@ -41,4 +41,10 @@ public class RestaurantController {
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/restaurant/order/byuser")
+    public List<OrderDetails> findByuserId(@RequestParam UUID userId) {
+
+        return restaurantService.getOrderByUserId(userId);
+    }
+
 }

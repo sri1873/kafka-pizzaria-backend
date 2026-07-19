@@ -19,9 +19,7 @@ public class Rider {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID riderId;
-
     private String name;
-    private boolean active;
     private boolean assigned;
 
 

@@ -1,5 +1,6 @@
 package com.kafka.learn.service;
 
+import com.kafka.learn.entities.RiderLocation;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.geo.Circle;
@@ -31,6 +32,14 @@ public class RiderLocationService {
     public void updateLocation(UUID riderId, double lat, double lng) {
         geoOperations.add(RIDERS_KEY, new Point(lng, lat), riderId);
         redisTemplate.expire(riderId.toString(), 30, TimeUnit.SECONDS); // auto-expire offline riders
+    }
+
+    public RiderLocation getLocation(UUID riderId) {
+        Point point = geoOperations.position(RIDERS_KEY, riderId).get(0);
+        if (point != null) {
+            return RiderLocation.builder().longitude(point.getX()).latitude(point.getY()).build();
+        }
+        return null;
     }
 
     public List<UUID> findNearbyRiders(Point restaurantLocation, double radiusKm) {

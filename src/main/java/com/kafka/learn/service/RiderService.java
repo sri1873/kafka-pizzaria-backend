@@ -48,8 +48,6 @@ public class RiderService {
         System.out.println("Consumed Message in rider service: " + order.toString());
         if (order.getStatus() == OrderStatus.READY_FOR_PICKUP) {
             assignRider(order);
-            order.setLastUpdated(Instant.now());
-            restaurantRepository.save(order);
         }
     }
 
@@ -57,27 +55,34 @@ public class RiderService {
     private void assignRider(OrderDetails order) {
         List<UUID> nearbyRiders = riderLocationService.findNearbyRiders(restaurantLocation, 5.0);
         for (UUID riderId : nearbyRiders) {
-            CompletableFuture<Boolean> future = new CompletableFuture<>();
-            pendingResponses.put(order.getOrderId(), future);
-            notificationService.sendNotification(riderId,
-                    Notification.builder().role("RIDER").orderDetails(order).orderId(order.getOrderId()).message("NEW ORDER ASSIGNMENT").build());
-            try {
-                // wait up to 10 seconds for accept/decline
-                Boolean accepted = future.get(10, TimeUnit.SECONDS);
-                if (accepted) {
-                    Rider rider = riderRepository.findByRiderId(riderId).orElse(null);
-                    order.setRider(rider);
-                    order.setStatus(OrderStatus.RIDER_ASSIGNED);
-                    kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
-                    return; // done — stop the loop
+            if (restaurantRepository.findByRiderIdAndStatusNot(riderId).isEmpty()) {
+                CompletableFuture<Boolean> future = new CompletableFuture<>();
+                pendingResponses.put(order.getOrderId(), future);
+                notificationService.sendNotification(riderId,
+                        Notification.builder().role("RIDER").orderDetails(order).orderId(order.getOrderId()).message("NEW ORDER ASSIGNMENT").build());
+                try {
+                    // wait up to 10 seconds for accept/decline
+                    Boolean accepted = future.get(10, TimeUnit.SECONDS);
+                    if (accepted) {
+                        Rider rider = riderRepository.findByRiderId(riderId).orElse(null);
+                        rider.setAssigned(true);
+                        order.setRider(rider);
+                        order.setStatus(OrderStatus.RIDER_ASSIGNED);
+                        order.setLastUpdated(Instant.now());
+                        riderRepository.save(rider);
+                        restaurantRepository.save(order);
+                        kafkaTemplate.send("order_info", order.getOrderId().toString(), order);
+
+                        return;
+                    }
+                    // declined — move to next rider
+                } catch (TimeoutException e) {
+                    // no response in time — move to next rider
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    pendingResponses.remove(order.getOrderId());
                 }
-                // declined — move to next rider
-            } catch (TimeoutException e) {
-                // no response in time — move to next rider
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                pendingResponses.remove(order.getOrderId());
             }
         }
     }
@@ -103,8 +108,10 @@ public class RiderService {
             OrderDetails orderDetails = orderDetailsOptional.get();
             orderDetails.setStatus(OrderStatus.DELIVERED);
             orderDetails.setLastUpdated(Instant.now());
+            orderDetails.getRider().setAssigned(false);
             restaurantRepository.save(orderDetails);
-            kafkaTemplate.send("order_info",orderId.toString(), orderDetails);
+            riderRepository.save(orderDetails.getRider());
+            kafkaTemplate.send("order_info", orderId.toString(), orderDetails);
         }
     }
 
@@ -115,7 +122,7 @@ public class RiderService {
             orderDetails.setStatus(OrderStatus.OUT_FOR_DELIVERY);
             orderDetails.setLastUpdated(Instant.now());
             restaurantRepository.save(orderDetails);
-            kafkaTemplate.send("order_info",orderId.toString(), orderDetails);
+            kafkaTemplate.send("order_info", orderId.toString(), orderDetails);
         }
     }
 

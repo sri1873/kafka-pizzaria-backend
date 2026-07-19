@@ -10,7 +10,7 @@ An event-driven food delivery backend built on Apache Kafka, showcasing real-tim
 
 This project was built to model how a real delivery platform (think Deliveroo, Uber Eats) coordinates **multiple independent services that don't call each other directly**, but instead react to a shared stream of events. The goal was to get hands-on with the patterns that actually show up at that scale: event-driven architecture, geospatial matching, sequential offer-based assignment, and multiple real-time transport protocols each used for the job they're actually suited to.
 
-Also as a side note to learn and try out kafka
+Also, as a side note, to learn and try out Kafka.
 
 ---
 
@@ -69,7 +69,7 @@ When an order is ready, nearby riders are found via Redis `GEORADIUS` and offere
 Boolean accepted = future.get(10, TimeUnit.SECONDS);
 ```
 
-If the rider accepts, the future completes and the order is locked to them immediately — no other rider is ever notified, so there's no possibility of a double-accept race condition. If they decline or time out, the loop moves to the next-closest rider. This trades a small amount of latency (worst case: 10s × number of riders tried) for correctness without needing distributed locks.
+If the rider accepts, the future completes, and the order is locked to them immediately — no other rider is ever notified, so there's no possibility of a double-accept race condition. If they decline or time out, the loop moves to the next-closest rider. This trades a small amount of latency (worst case: 10s × number of riders tried) for correctness without needing distributed locks.
 
 *Production note:* this in-memory approach is appropriate for a single instance. At multi-instance scale, the same pattern would move to a database-backed offer table with a scheduled expiry sweep, so state survives restarts and works across horizontally scaled instances.
 
@@ -126,7 +126,7 @@ The app starts on `localhost:8080` and connects to Kafka/Redis automatically. H2
 
 ### 3. Verify
 ```bash
-# Kafka topic exists and broker is reachable
+# Kafka topic exists, and broker is reachable
 docker exec -it broker kafka-topics.sh --bootstrap-server localhost:9092 --list
 
 # Redis is reachable
@@ -146,7 +146,7 @@ src/main/java/com/kafka/learn/
 │   ├── RiderService.java            # sequential assignment, accept/reject/pickup/deliver
 │   ├── RiderLocationService.java    # Redis GEOADD/GEORADIUS operations
 │   ├── NotificationService.java     # SSE emitter management, per-user notification cache
-│   └── ...
+│   └── ...,
 ├── config/
 │   ├── WebSocketConfig.java         # rider location ingestion endpoint
 │   └── KafkaConfig.java
@@ -159,8 +159,8 @@ src/main/java/com/kafka/learn/
 
 - Currently only the latest state is retained -> Persist full order status history to support order timelines surviving a page refresh
 - Move rider-offer state from in-memory `CompletableFuture` to a DB-backed table with scheduled expiry, for multi-instance correctness
-- Fixed demo coordinates used currently -> Geocode arbitrary delivery addresses.
-- Swap H2 for Postgres and containerize the full stack for deployment
+- Fixed demo coordinates used -> Geocode arbitrary delivery addresses currently.
+- Swap H2 for Postgres and containerise the full stack for deployment
 
 ---
 
@@ -172,4 +172,4 @@ Frontend built in React + Vite + Tailwind, consuming this backend via REST, SSE,
 
 ## Acknowledgement and Side note
 
-Most of the README and the ideation process included the use of AI. I forced myself to use orginal documentation for Redis, Kafka and Mapbox as I wanted to learn these tecnologies but used AI to speed up the dev process mostly CSS and jsx.
+Most of the README and the ideation process included the use of AI. I forced myself to use original documentation for Redis, Kafka and Mapbox, as I wanted to learn these technologies but used AI to speed up the dev process, mostly CSS and JSX.
